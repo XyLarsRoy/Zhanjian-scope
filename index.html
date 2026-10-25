@@ -1,0 +1,2531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>展会测评 · 杭州展览展会活动地图与点评社区</title>
+<meta name="description" content="展会测评：杭州展览展会活动导览平台。提供杭州展会地图、展历日历、热门展览推荐、展览详情测评、开票提醒与看展路线导航，发现杭州正在展出的好活动。">
+<meta name="keywords" content="杭州展会,杭州展览,展会地图,展历,展览测评,展会活动,杭州国际博览中心,杭州大会展中心,看展">
+<meta name="robots" content="index,follow">
+<meta property="og:type" content="website">
+<meta property="og:title" content="展会测评 · 杭州展览展会活动地图与点评社区">
+<meta property="og:description" content="杭州展会地图、展历、热门展览推荐与看展测评社区，发现正在展出的好活动。">
+<link rel="icon" href="splash.jpg">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root {
+    --primary: #5B67E8;
+    --primary-2: #7C86F3;
+    --primary-deep: #3B4AC8;
+    --accent: #8B7BF5;
+    --text-main: #1F2A5A;
+    --text-sub: #8A93B8;
+    --text-muted: #B8BFDB;
+    --bg: #F3F5FC;
+    --card: #FFFFFF;
+    --green: #36C28A;
+    --orange: #F59E0B;
+    --red: #F87171;
+    --radius: 16px;
+    --shadow-sm: 0 2px 10px rgba(31, 42, 90, .06);
+    --shadow-md: 0 6px 18px rgba(31, 42, 90, .1);
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    margin: 0;
+    color: var(--text-main);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ==================== 手机外壳 ==================== */
+  .phone {
+    position: relative;
+    width: 390px;
+    height: 100vh;
+    max-height: 100vh;
+    background: var(--bg);
+    border-radius: 0;
+    overflow: hidden;
+    box-shadow: none;
+    border: none;
+  }
+
+  /* ==================== 开屏页 ==================== */
+  .splash {
+    position: absolute;
+    inset: 0;
+    z-index: 60;
+    background: #E8ECFB url("splash.jpg") no-repeat center center;
+    background-size: cover;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 70px;
+    transition: opacity .5s ease, visibility .5s ease;
+    overflow: hidden;
+  }
+  .splash.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+  /* 图中已含 logo/标题/副标题，隐藏原文本元素 */
+  .splash .skyline,
+  .splash .water,
+  .splash .logo-wrap,
+  .splash h1,
+  .splash .sub { display: none; }
+
+  .splash .start-btn {
+    width: 220px;
+    height: 58px;
+    background: transparent;
+    border: none;
+    color: transparent;
+    padding: 0;
+    box-shadow: none;
+    font-size: 0;
+    border-radius: 29px;
+    cursor: pointer;
+  }
+  .splash .start-btn:active { transform: scale(.97); background: rgba(255,255,255,.15); }
+  .splash .start-btn svg { display: none; }
+
+  /* ==================== 应用容器 ==================== */
+  .app {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    transition: opacity .4s ease;
+  }
+  .app.hidden { opacity: 0; pointer-events: none; }
+
+  .views { position: relative; flex: 1; overflow: hidden; }
+  .view {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .2s ease;
+  }
+  .view.active { opacity: 1; visibility: visible; pointer-events: auto; }
+
+  .view-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 16px 90px;
+    scrollbar-width: none;
+  }
+  .view-body::-webkit-scrollbar { display: none; }
+
+  /* 顶部内边距 */
+  .top-pad { height: 16px; flex-shrink: 0; }
+
+  /* ==================== 顶部条（首页用） ==================== */
+  .home-top {
+    padding: 0 16px 0;
+    flex-shrink: 0;
+  }
+  .loc-row {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 16px; font-weight: 700;
+    color: var(--text-main);
+    margin: 4px 0 14px;
+  }
+  .loc-row svg { width: 16px; height: 16px; color: var(--primary); }
+  .loc-row .caret { color: var(--text-sub); font-size: 12px; }
+
+  .search-bar {
+    display: flex; align-items: center; gap: 8px;
+    background: #fff;
+    border-radius: 999px;
+    padding: 10px 14px;
+    box-shadow: var(--shadow-sm);
+  }
+  .search-bar svg { width: 16px; height: 16px; color: var(--text-muted); flex-shrink: 0; }
+  .search-bar input {
+    flex: 1; min-width: 0; border: none; outline: none;
+    background: transparent; font-size: 13px; font-family: inherit;
+    color: var(--text-main);
+  }
+  .search-bar input::placeholder { color: var(--text-muted); }
+
+  /* ==================== Banner 卡片 ==================== */
+  .banner {
+    position: relative;
+    margin: 16px 0 18px;
+    height: 150px;
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: var(--shadow-md);
+    color: #fff;
+  }
+  .banner .bg {
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, #7B86F2 0%, #5B67E8 55%, #3B4AC8 100%);
+  }
+  .banner .bg img {
+    width: 100%; height: 100%; object-fit: cover;
+    opacity: .55; mix-blend-mode: overlay;
+  }
+  .banner .shade {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, rgba(30,40,90,.72) 0%, rgba(30,40,90,.25) 55%, transparent 100%);
+  }
+  .banner .content {
+    position: relative;
+    height: 100%;
+    padding: 18px;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .banner .venue-tag {
+    font-size: 13px; font-weight: 700; margin-bottom: 2px;
+  }
+  .banner .title {
+    font-size: 18px; font-weight: 800; line-height: 1.3;
+    max-width: 70%;
+  }
+  .banner .bottom { display: flex; align-items: center; gap: 10px; }
+  .banner .date-chip {
+    background: rgba(255,255,255,.22);
+    backdrop-filter: blur(4px);
+    border-radius: 999px;
+    padding: 5px 12px;
+    font-size: 11px; font-weight: 600;
+  }
+  .banner .detail-btn {
+    border: none;
+    background: #fff;
+    color: var(--primary-deep);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 11px; font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+  }
+
+  /* ==================== 模块入口 ==================== */
+  .modules {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    margin-bottom: 22px;
+  }
+  .module-btn {
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    background: transparent; border: none; cursor: pointer;
+    font-family: inherit; font-size: 11px; color: var(--text-main);
+    padding: 6px 0;
+    border-radius: 12px;
+    transition: background .15s ease;
+  }
+  .module-btn:active { background: rgba(91,103,232,.08); }
+  .module-btn .ic {
+    width: 50px; height: 50px;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: var(--shadow-sm);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--primary);
+    transition: transform .15s ease;
+  }
+  .module-btn:active .ic { transform: scale(.94); }
+  .module-btn .ic svg { width: 24px; height: 24px; }
+  .module-btn .ic.c2 { color: #8B7BF5; }
+  .module-btn .ic.c3 { color: #F59E0B; }
+  .module-btn .ic.c4 { color: #F87171; }
+
+  /* ==================== 节标题 ==================== */
+  .section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .section-head h2 {
+    margin: 0;
+    font-size: 17px; font-weight: 800;
+  }
+  .section-head .more {
+    font-size: 12px; color: var(--text-sub);
+    display: flex; align-items: center; gap: 2px;
+  }
+
+  /* ==================== 展会列表卡片 ==================== */
+  .exh-card {
+    display: flex; gap: 12px;
+    background: var(--card);
+    border-radius: 16px;
+    padding: 10px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow-sm);
+    transition: transform .15s ease, box-shadow .15s ease;
+  }
+  .exh-card:active { transform: scale(.99); }
+  .exh-thumb {
+    position: relative;
+    width: 100px; height: 100px;
+    flex-shrink: 0;
+    border-radius: 12px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #C7CEF0, #9BA9E0);
+  }
+  .exh-thumb img {
+    width: 100%; height: 100%; object-fit: cover;
+  }
+  .exh-thumb .status-badge {
+    position: absolute;
+    top: 6px; left: 6px;
+    font-size: 9px;
+    font-weight: 700;
+    color: #fff;
+    padding: 2px 7px;
+    border-radius: 6px;
+    background: var(--primary);
+  }
+  .exh-thumb .status-badge.ongoing { background: var(--green); }
+  .exh-thumb .status-badge.upcoming { background: var(--orange); }
+  .exh-thumb .status-badge.ending { background: var(--red); }
+  .exh-thumb .status-badge.ended { background: var(--text-muted); }
+
+  .exh-info {
+    flex: 1; min-width: 0;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 2px 0;
+  }
+  .exh-info .name {
+    font-size: 13.5px; font-weight: 700; line-height: 1.4;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .exh-info .meta {
+    font-size: 11px; color: var(--text-sub);
+    display: flex; align-items: center; gap: 5px;
+    margin-top: 6px;
+  }
+  .exh-info .meta svg { width: 11px; height: 11px; flex-shrink: 0; }
+  .exh-info .bottom-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 6px;
+  }
+  .exh-info .rating {
+    display: flex; align-items: center; gap: 3px;
+    font-size: 12px; font-weight: 800; color: var(--orange);
+  }
+  .exh-info .rating svg { width: 13px; height: 13px; fill: var(--orange); }
+  .fav-btn {
+    width: 30px; height: 30px;
+    border: none; border-radius: 50%;
+    background: #F3F5FE;
+    color: #B9C0D8;
+    font-size: 15px; line-height: 1;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background .15s ease, color .15s ease;
+  }
+  .fav-btn.on { background: #FFF4E0; color: var(--orange); }
+
+  /* ==================== 地图页 ==================== */
+  .map-page .map-body {
+    position: absolute; inset: 0;
+    padding: 0;
+  }
+  #map { position: absolute; inset: 0; background: #E8EDF7; }
+  .map-fallback {
+    position: absolute; inset: 0;
+    display: none; overflow-y: auto;
+    padding: 14px 12px;
+  }
+
+  .map-top {
+    position: absolute; top: 0; left: 0; right: 0;
+    z-index: 500;
+    padding: 16px 16px 12px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .map-search {
+    flex: 1;
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(8px);
+    border-radius: 999px;
+    padding: 9px 14px;
+    display: flex; align-items: center; gap: 8px;
+    box-shadow: 0 4px 14px rgba(31,42,90,.12);
+  }
+  .map-search svg { width: 15px; height: 15px; color: var(--text-sub); }
+  .map-search span { font-size: 12px; color: var(--text-sub); }
+  .map-seg {
+    display: flex;
+    background: rgba(255,255,255,.9);
+    border-radius: 999px;
+    padding: 4px;
+    box-shadow: 0 4px 14px rgba(31,42,90,.12);
+  }
+  .map-seg button {
+    border: none; background: transparent;
+    font-family: inherit; font-size: 12px; font-weight: 600;
+    color: var(--text-sub);
+    padding: 6px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all .2s ease;
+  }
+  .map-seg button.on {
+    background: var(--primary);
+    color: #fff;
+  }
+
+  .map-legend {
+    position: absolute;
+    left: 16px; bottom: 86px;
+    z-index: 500;
+    background: rgba(255,255,255,.94);
+    backdrop-filter: blur(6px);
+    border-radius: 12px;
+    padding: 10px 12px;
+    font-size: 11px;
+    box-shadow: var(--shadow-md);
+  }
+  .map-legend .row {
+    display: flex; align-items: center; gap: 7px;
+    margin-bottom: 5px;
+  }
+  .map-legend .row:last-child { margin-bottom: 0; }
+  .map-legend .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+  }
+
+  .map-zoom {
+    position: absolute;
+    right: 16px; bottom: 86px;
+    z-index: 500;
+    display: flex; flex-direction: column; gap: 8px;
+  }
+  .map-zoom button, .map-compass {
+    width: 34px; height: 34px;
+    border: none; border-radius: 10px;
+    background: rgba(255,255,255,.94);
+    backdrop-filter: blur(6px);
+    font-size: 18px; font-weight: 700;
+    color: var(--text-main);
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .map-compass { margin-bottom: 8px; }
+
+  /* Leaflet 标记自定义 */
+  .venue-pin {
+    width: 26px; height: 26px;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+    background: var(--primary);
+    border: 3px solid #fff;
+    box-shadow: 0 3px 8px rgba(31,42,90,.35);
+  }
+  .venue-pin.ongoing { background: var(--primary); }
+  .venue-pin.upcoming { background: var(--orange); }
+  .venue-pin.ending { background: var(--red); }
+  .venue-pin.ended { background: var(--text-muted); }
+  .venue-pin span {
+    display: block;
+    width: 8px; height: 8px;
+    background: #fff;
+    border-radius: 50%;
+    margin: 5px auto 0;
+  }
+
+  .leaflet-popup-content-wrapper {
+    border-radius: 14px;
+    box-shadow: 0 8px 24px rgba(31,42,90,.18);
+    padding: 0;
+  }
+  .leaflet-popup-content { margin: 0; }
+  .pop-card {
+    display: flex; gap: 10px;
+    padding: 10px;
+    min-width: 220px;
+  }
+  .pop-thumb {
+    width: 60px; height: 60px;
+    border-radius: 10px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #C7CEF0, #9BA9E0);
+    flex-shrink: 0;
+  }
+  .pop-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .pop-info { flex: 1; min-width: 0; }
+  .pop-info .v-name { font-size: 11px; color: var(--text-sub); margin-bottom: 2px; }
+  .pop-info .e-name {
+    font-size: 13px; font-weight: 700; line-height: 1.35;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+  .pop-info .row2 {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 4px;
+  }
+  .pop-info .date { font-size: 10px; color: var(--text-sub); }
+  .pop-info .rating {
+    font-size: 11px; font-weight: 800; color: var(--orange);
+    display: flex; align-items: center; gap: 2px;
+  }
+  .pop-info .go-btn {
+    margin-top: 6px;
+    border: none;
+    background: var(--primary);
+    color: #fff;
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 10px; font-weight: 700;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .leaflet-popup-tip { box-shadow: 0 8px 24px rgba(31,42,90,.18); }
+
+  /* 离线场馆卡片 */
+  .venue-card {
+    background: #fff; border-radius: 14px; padding: 12px;
+    margin-bottom: 10px; box-shadow: var(--shadow-sm);
+  }
+  .venue-card h4 { margin: 0 0 2px; font-size: 13px; }
+  .venue-card .v-addr { font-size: 10px; color: var(--text-sub); margin-bottom: 8px; }
+  .venue-ex {
+    font-size: 11px; padding: 6px 0; border-top: 1px dashed #EDF0FA;
+  }
+  .venue-ex em { display: block; font-style: normal; font-size: 10px; color: var(--primary); margin-top: 2px; }
+
+  /* ==================== 展历页 ==================== */
+  .subbar {
+    display: flex; align-items: center; gap: 10px;
+    flex-shrink: 0;
+    padding: 8px 16px;
+    background: var(--bg);
+  }
+  .subbar h2 { margin: 0; font-size: 18px; font-weight: 800; }
+  .subbar .sub-note { margin-left: auto; font-size: 11px; color: var(--text-sub); }
+
+  .cal-topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 16px 12px;
+  }
+  .cal-topbar h2 { margin: 0; font-size: 20px; font-weight: 800; }
+  .cal-today {
+    width: 34px; height: 34px; border-radius: 10px;
+    border: none; background: #fff;
+    color: var(--primary);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .cal-head {
+    display: flex; align-items: center; justify-content: space-between;
+    background: #fff;
+    border-radius: 14px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow-sm);
+  }
+  .cal-head .month { font-size: 15px; font-weight: 700; }
+  .cal-navs { display: flex; gap: 6px; }
+  .cal-nav {
+    border: none; background: #F2F4FD;
+    color: var(--primary-deep);
+    width: 28px; height: 28px; border-radius: 8px;
+    font-size: 16px; font-family: inherit;
+    cursor: pointer;
+  }
+  .cal-week {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    text-align: center; font-size: 11px; color: var(--text-sub);
+    margin-bottom: 6px;
+  }
+  .cal-grid {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    background: #fff;
+    border-radius: 14px;
+    padding: 8px;
+    margin-bottom: 12px;
+    box-shadow: var(--shadow-sm);
+  }
+  .cal-day {
+    position: relative;
+    height: 42px;
+    border: none; background: transparent;
+    border-radius: 10px;
+    font-size: 12px; font-family: inherit;
+    color: var(--text-main);
+    cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .cal-day.blank { cursor: default; }
+  .cal-day.today { outline: 1.5px solid var(--primary); outline-offset: -1.5px; }
+  .cal-day.selected { background: var(--primary); color: #fff; }
+  .cal-day.selected .cal-dot { background: #fff; }
+  .cal-dot {
+    width: 4px; height: 4px; border-radius: 50%;
+    margin-top: 3px;
+    background: transparent;
+  }
+  .cal-dot.start { background: var(--primary); }
+  .cal-dot.middle { background: var(--green); }
+  .cal-dot.end { background: var(--orange); }
+
+  .cal-legend {
+    display: flex; justify-content: center; gap: 18px;
+    margin-bottom: 16px;
+  }
+  .cal-legend .row {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--text-sub);
+  }
+  .cal-legend .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+  }
+
+  .cal-detail-title {
+    font-size: 14px; font-weight: 700;
+    margin: 0 0 10px 4px;
+  }
+  .day-item {
+    background: #fff; border-radius: 14px; padding: 12px;
+    margin-bottom: 10px; box-shadow: var(--shadow-sm);
+  }
+  .day-item .d-head {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
+  }
+  .day-item .d-name { font-size: 13px; font-weight: 700; line-height: 1.45; flex: 1; }
+  .day-item .d-status {
+    font-size: 10px; font-weight: 700; color: #fff;
+    padding: 2px 8px; border-radius: 6px; flex-shrink: 0;
+  }
+  .day-item .d-meta { font-size: 11px; color: var(--text-sub); margin: 4px 0 8px; }
+  .day-item .d-actions {
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .remind-btn {
+    border: none; background: #EAF0FF; color: var(--primary-deep);
+    border-radius: 999px; padding: 4px 12px;
+    font-size: 11px; font-weight: 600; font-family: inherit;
+    cursor: pointer;
+  }
+  .d-countdown { font-size: 11px; color: var(--orange); font-weight: 600; }
+
+  .empty-tip {
+    text-align: center; font-size: 12px; color: var(--text-sub);
+    padding: 40px 10px; line-height: 1.8;
+  }
+
+  /* ==================== 热门活动 ==================== */
+  .hot-card {
+    display: flex; gap: 12px;
+    background: #fff; border-radius: 16px; padding: 10px;
+    margin-bottom: 12px; box-shadow: var(--shadow-sm);
+    position: relative;
+  }
+  .hot-rank {
+    position: absolute; top: 6px; left: 6px;
+    width: 22px; height: 22px; border-radius: 7px;
+    background: var(--primary); color: #fff;
+    font-size: 11px; font-weight: 800;
+    display: flex; align-items: center; justify-content: center;
+    z-index: 2;
+  }
+
+  /* ==================== 我的 ==================== */
+  .mine-body { background: var(--bg); }
+  .mine-header {
+    background: linear-gradient(135deg, #6B77E8 0%, #5B67E8 60%, #4A55D8 100%);
+    padding: 18px 16px 0;
+    margin-bottom: -20px;
+  }
+  .mine-header-bar {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .mine-header-bar h2 { margin: 0; font-size: 22px; font-weight: 800; color: #fff; }
+  .mine-header-bar .gear {
+    width: 34px; height: 34px; border-radius: 50%;
+    border: none; background: rgba(255,255,255,.2);
+    color: #fff; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .profile-card {
+    background: #fff;
+    border-radius: 20px 20px 0 0;
+    padding: 20px 20px 6px;
+    margin: 0 -16px;
+  }
+  .mine-head {
+    display: flex; align-items: center; gap: 14px;
+  }
+  .avatar {
+    width: 62px; height: 62px; border-radius: 50%;
+    background: linear-gradient(135deg, #C7CEF0, #9BA9E0);
+    border: 3px solid #fff;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .mine-name { font-size: 18px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+  .lv-badge {
+    background: linear-gradient(135deg, #F0D78C, #E8B968);
+    color: #fff; font-size: 10px; font-weight: 700;
+    padding: 2px 8px; border-radius: 999px;
+  }
+  .mine-sub { font-size: 11px; color: var(--text-sub); margin-top: 3px; }
+
+  .stats {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    text-align: center;
+    padding: 10px 0 20px;
+  }
+  .stats strong { display: block; font-size: 20px; font-weight: 800; }
+  .stats span { font-size: 11px; color: var(--text-sub); }
+
+  .dual-cards {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    padding: 0 16px 18px;
+  }
+  .dual-card {
+    border-radius: 18px;
+    padding: 16px;
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+    min-height: 96px;
+    display: flex; flex-direction: column; justify-content: space-between;
+  }
+  .dual-card.purple { background: linear-gradient(135deg, #B8A6F5 0%, #8B7BF5 100%); }
+  .dual-card.blue { background: linear-gradient(135deg, #8FB6F5 0%, #5B8DE8 100%); }
+  .dual-card .dc-icon {
+    position: absolute; top: 12px; right: 12px;
+    width: 36px; height: 36px; border-radius: 12px;
+    background: rgba(255,255,255,.25);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .dual-card .dc-title { font-size: 14px; font-weight: 700; }
+  .dual-card .dc-count { font-size: 11px; opacity: .9; margin-top: 4px; }
+  .dual-card .dc-arrow { position: absolute; bottom: 14px; right: 16px; opacity: .85; }
+
+  .shortcuts {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding: 6px 16px 20px;
+  }
+  .shortcut {
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+    background: transparent; border: none; cursor: pointer;
+    font-family: inherit; font-size: 10px; color: var(--text-main);
+    padding: 6px 0;
+  }
+  .shortcut .sc-ic {
+    width: 46px; height: 46px; border-radius: 14px;
+    background: #fff; box-shadow: var(--shadow-sm);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--primary);
+  }
+  .shortcut:nth-child(2) .sc-ic { color: var(--accent); }
+  .shortcut:nth-child(3) .sc-ic { color: var(--orange); }
+  .shortcut:nth-child(4) .sc-ic { color: var(--green); }
+
+  .menu {
+    background: #fff;
+    border-radius: 16px;
+    margin: 0 16px 16px;
+    box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .menu button {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%;
+    border: none; background: transparent;
+    padding: 14px 16px;
+    font-size: 13px; font-family: inherit; color: var(--text-main);
+    cursor: pointer;
+    border-bottom: 1px solid #F2F4FB;
+    text-align: left;
+  }
+  .menu button:last-child { border-bottom: none; }
+  .menu button:active { background: #F8F9FE; }
+  .menu button .m-ic {
+    width: 26px; height: 26px; border-radius: 8px;
+    background: #F2F4FD;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--primary);
+  }
+  .menu button .arrow { margin-left: auto; color: #C3C9DF; font-size: 16px; }
+  .menu-status { font-size: 11px; color: var(--green); margin-left: auto; }
+
+  /* ==================== 社区 ==================== */
+  .community-head {
+    padding: 18px 16px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .community-head h2 { margin: 0; font-size: 20px; font-weight: 800; }
+  .add-btn {
+    width: 34px; height: 34px; border-radius: 12px;
+    border: none;
+    background: var(--primary); color: #fff;
+    font-size: 20px; font-weight: 700;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 6px 14px rgba(91,103,232,.3);
+  }
+  .tabs {
+    display: flex; gap: 20px;
+    padding: 0 16px 12px;
+    border-bottom: 1px solid #EDF0FA;
+  }
+  .tabs button {
+    border: none; background: transparent;
+    font-family: inherit; font-size: 14px; font-weight: 600;
+    color: var(--text-sub);
+    padding: 0 0 8px;
+    cursor: pointer;
+    position: relative;
+  }
+  .tabs button.on { color: var(--text-main); font-weight: 700; }
+  .tabs button.on::after {
+    content: ""; position: absolute;
+    bottom: -1px; left: 0; right: 0;
+    height: 3px; border-radius: 2px;
+    background: var(--primary);
+  }
+
+  .post {
+    background: #fff;
+    border-radius: 16px;
+    padding: 14px;
+    margin: 14px 16px 0;
+    box-shadow: var(--shadow-sm);
+  }
+  .post-head {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .post-avatar {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: linear-gradient(135deg, #C7CEF0, #9BA9E0);
+    overflow: hidden;
+  }
+  .post-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .post-user { flex: 1; }
+  .post-user .name { font-size: 13px; font-weight: 700; }
+  .post-user .time { font-size: 10px; color: var(--text-sub); }
+  .follow-btn {
+    border: none; background: var(--primary); color: #fff;
+    border-radius: 999px; padding: 5px 14px;
+    font-size: 11px; font-weight: 700;
+    font-family: inherit; cursor: pointer;
+  }
+  .post-text {
+    font-size: 13px; line-height: 1.6;
+    margin: 10px 0;
+  }
+  .post-imgs {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 5px;
+    margin-bottom: 10px;
+  }
+  .post-imgs div {
+    aspect-ratio: 1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #C7CEF0, #9BA9E0);
+  }
+  .post-imgs img { width: 100%; height: 100%; object-fit: cover; }
+  .post-tag {
+    font-size: 11px; color: var(--primary);
+    background: #EAF0FF;
+    padding: 3px 10px;
+    border-radius: 6px;
+    display: inline-block;
+  }
+  .post-actions {
+    display: flex; gap: 22px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #F2F4FB;
+  }
+  .post-actions button {
+    border: none; background: transparent;
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; color: var(--text-sub);
+    font-family: inherit; cursor: pointer;
+    padding: 0;
+  }
+
+  .fab {
+    position: absolute;
+    right: 16px; bottom: 90px;
+    width: 54px; height: 54px; border-radius: 50%;
+    border: none;
+    background: linear-gradient(135deg, #7C86F3, #5B67E8);
+    color: #fff;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 8px 20px rgba(91,103,232,.4);
+    z-index: 10;
+  }
+
+  /* ==================== 详情页 ==================== */
+  .detail-page { background: #fff; }
+  .detail-topbar {
+    position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 16px 0;
+  }
+  .detail-icon-btn {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: none; background: rgba(255,255,255,.9);
+    backdrop-filter: blur(6px);
+    color: var(--text-main);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 8px rgba(31,42,90,.15);
+  }
+  .detail-icon-btn.right { display: flex; gap: 10px; background: transparent; box-shadow: none; padding: 0; width: auto; height: auto; }
+  .detail-icon-btn.right .ib {
+    width: 36px; height: 36px; border-radius: 50%;
+    border: none; background: rgba(255,255,255,.9);
+    color: var(--text-main); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 8px rgba(31,42,90,.15);
+  }
+  .detail-hero {
+    width: 100%; height: 220px;
+    background: linear-gradient(135deg, #C7CEF0, #9BA9E0);
+    overflow: hidden;
+  }
+  .detail-hero img { width: 100%; height: 100%; object-fit: cover; }
+  .detail-body { padding: 16px 16px 100px; }
+  .detail-title { font-size: 20px; font-weight: 800; line-height: 1.4; margin-bottom: 10px; }
+  .detail-meta-row {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .detail-status {
+    font-size: 11px; font-weight: 700; color: #fff;
+    padding: 3px 10px; border-radius: 6px;
+  }
+  .detail-rating {
+    display: flex; align-items: center; gap: 4px;
+    font-size: 14px; font-weight: 800; color: var(--orange);
+  }
+  .detail-rating svg { width: 15px; height: 15px; fill: var(--orange); }
+  .detail-rating .rcount { font-size: 11px; color: var(--text-sub); font-weight: 500; }
+  .detail-info-line {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12.5px; color: var(--text-main);
+    margin-bottom: 8px;
+  }
+  .detail-info-line svg { width: 15px; height: 15px; color: var(--text-sub); flex-shrink: 0; }
+  .detail-section-title {
+    font-size: 15px; font-weight: 800;
+    margin: 18px 0 10px;
+  }
+  .detail-desc {
+    font-size: 13px; line-height: 1.7; color: #4A5580;
+  }
+  .detail-actions {
+    display: flex; gap: 10px;
+    margin: 20px 0 14px;
+  }
+  .detail-action {
+    flex: 1;
+    display: flex; flex-direction: column; align-items: center; gap: 5px;
+    border: none; background: #F5F7FC;
+    border-radius: 14px; padding: 12px 8px;
+    font-family: inherit; font-size: 11px; color: var(--text-main);
+    cursor: pointer;
+  }
+  .detail-action svg { width: 22px; height: 22px; color: var(--primary); }
+  .detail-action.on svg { color: var(--orange); fill: var(--orange); }
+  .go-here-btn {
+    width: 100%;
+    border: none; background: var(--primary);
+    color: #fff;
+    border-radius: 999px;
+    padding: 14px;
+    font-size: 15px; font-weight: 700; font-family: inherit;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    box-shadow: 0 8px 20px rgba(91,103,232,.35);
+    margin-bottom: 20px;
+  }
+  .detail-tabs {
+    display: flex; gap: 20px;
+    border-bottom: 1px solid #EEF1FB;
+    margin-bottom: 14px;
+  }
+  .detail-tabs button {
+    border: none; background: transparent;
+    font-family: inherit; font-size: 14px; font-weight: 600;
+    color: var(--text-sub);
+    padding: 0 0 10px;
+    cursor: pointer;
+  }
+  .detail-tabs button.on { color: var(--primary); font-weight: 700; border-bottom: 2px solid var(--primary); margin-bottom: -1px; }
+  .review-section { margin-top: 20px; }
+  .review-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .review-head h3 { margin: 0; font-size: 15px; font-weight: 800; }
+  .review-empty {
+    text-align: center; font-size: 12px; color: var(--text-muted);
+    padding: 20px 0;
+  }
+  .write-review h4 { font-size: 14px; font-weight: 700; margin: 16px 0 10px; }
+  .star-row { display: flex; gap: 6px; margin-bottom: 12px; }
+  .star-row button {
+    border: none; background: transparent; padding: 0; cursor: pointer;
+    color: #D8DCEE;
+  }
+  .star-row button.on { color: var(--orange); }
+  .star-row svg { width: 24px; height: 24px; fill: currentColor; }
+  .star-row .hint { font-size: 12px; color: var(--text-sub); margin-left: 8px; align-self: center; }
+  .review-textarea {
+    width: 100%; min-height: 90px;
+    border: none; background: #F5F7FC;
+    border-radius: 12px;
+    padding: 12px;
+    font-size: 13px; font-family: inherit;
+    color: var(--text-main);
+    resize: none; outline: none;
+  }
+  .review-textarea::placeholder { color: var(--text-muted); }
+  .review-footer {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-top: 8px;
+  }
+  .char-count { font-size: 11px; color: var(--text-muted); }
+  .publish-btn {
+    border: none; background: var(--primary); color: #fff;
+    border-radius: 999px; padding: 8px 18px;
+    font-size: 13px; font-weight: 700; font-family: inherit;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  /* ==================== 提醒开票页 ==================== */
+  .filter-tabs {
+    display: flex; gap: 8px;
+    margin-bottom: 14px;
+  }
+  .filter-tabs button {
+    border: none; background: #fff;
+    color: var(--text-sub);
+    border-radius: 999px;
+    padding: 6px 14px;
+    font-size: 12px; font-weight: 600; font-family: inherit;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+  }
+  .filter-tabs button.on { background: var(--primary); color: #fff; }
+  .remind-panel {
+    background: #fff; border-radius: 16px;
+    padding: 14px;
+    margin-top: 16px;
+    box-shadow: var(--shadow-sm);
+  }
+  .remind-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #F2F4FB;
+  }
+  .remind-row:last-of-type { border-bottom: none; }
+  .remind-icon {
+    width: 36px; height: 36px; border-radius: 10px;
+    background: #F2F4FD; color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .remind-text { flex: 1; }
+  .rt-title { font-size: 13px; font-weight: 700; }
+  .rt-sub { font-size: 11px; color: var(--text-sub); margin-top: 2px; }
+  .switch { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .slider {
+    position: absolute; cursor: pointer; inset: 0;
+    background: #D8DCEE; border-radius: 22px; transition: .2s;
+  }
+  .switch .slider::before {
+    content: ""; position: absolute;
+    height: 18px; width: 18px; left: 2px; top: 2px;
+    background: #fff; border-radius: 50%; transition: .2s;
+  }
+  .switch input:checked + .slider { background: var(--primary); }
+  .switch input:checked + .slider::before { transform: translateX(18px); }
+  .add-schedule-btn {
+    width: 100%; margin-top: 14px;
+    border: none; background: var(--primary); color: #fff;
+    border-radius: 999px; padding: 12px;
+    font-size: 14px; font-weight: 700; font-family: inherit;
+    cursor: pointer;
+  }
+
+  /* ==================== 去这里页 ==================== */
+  .nav-map {
+    height: 160px; border-radius: 16px;
+    background: linear-gradient(135deg, #DDE4F5, #C5CFE8);
+    margin: 12px 0 16px;
+    position: relative; overflow: hidden;
+    box-shadow: var(--shadow-sm);
+  }
+  .nav-map::before {
+    content: ""; position: absolute; inset: 0;
+    background:
+      linear-gradient(90deg, transparent 49%, rgba(91,103,232,.5) 49%, rgba(91,103,232,.5) 51%, transparent 51%) 30% 20%/8px 8px no-repeat,
+      repeating-linear-gradient(0deg, transparent, transparent 18px, rgba(255,255,255,.3) 18px, rgba(255,255,255,.3) 19px),
+      repeating-linear-gradient(90deg, transparent, transparent 18px, rgba(255,255,255,.3) 18px, rgba(255,255,255,.3) 19px);
+  }
+  .nav-map .pin-a, .nav-map .pin-b {
+    position: absolute; width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid #fff; box-shadow: 0 2px 6px rgba(0,0,0,.3);
+  }
+  .nav-map .pin-a { background: var(--primary); top: 60%; left: 22%; }
+  .nav-map .pin-b { background: var(--orange); top: 28%; right: 28%; }
+  .nav-map .route-line {
+    position: absolute; top: 30%; left: 24%;
+    width: 46%; height: 4px;
+    background: var(--primary); border-radius: 2px;
+    transform: rotate(-18deg);
+    transform-origin: left center;
+  }
+  .nav-tabs {
+    display: flex; gap: 8px;
+    margin-bottom: 14px;
+  }
+  .nav-tabs button {
+    flex: 1;
+    border: none; background: #fff;
+    color: var(--text-sub);
+    border-radius: 12px;
+    padding: 10px;
+    font-size: 13px; font-weight: 600; font-family: inherit;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+  }
+  .nav-tabs button.on { background: var(--primary); color: #fff; }
+  .nav-options { margin-bottom: 16px; }
+  .nav-option {
+    background: #fff; border-radius: 14px;
+    padding: 14px; margin-bottom: 10px;
+    box-shadow: var(--shadow-sm);
+    display: flex; align-items: center; gap: 12px;
+  }
+  .nav-option .no-ic {
+    width: 40px; height: 40px; border-radius: 12px;
+    background: #F2F4FD; color: var(--primary);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .nav-option .no-info { flex: 1; }
+  .nav-option .no-title { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+  .nav-option .no-sub { font-size: 11px; color: var(--text-sub); }
+  .nav-option .no-btn {
+    border: none; background: var(--primary); color: #fff;
+    border-radius: 999px; padding: 7px 14px;
+    font-size: 11px; font-weight: 700; font-family: inherit;
+    cursor: pointer;
+  }
+  .nav-option .no-btn.secondary { background: #fff; color: var(--primary); border: 1px solid var(--primary); }
+  .nav-view-btn {
+    width: 100%;
+    border: none; background: var(--primary); color: #fff;
+    border-radius: 999px; padding: 14px;
+    font-size: 14px; font-weight: 700; font-family: inherit;
+    cursor: pointer;
+  }
+  .nav-note {
+    text-align: center; font-size: 11px; color: var(--text-sub);
+    margin-top: 10px;
+  }
+
+  /* ==================== 底部导航 ==================== */
+  .tabbar {
+    flex-shrink: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    background: rgba(255,255,255,.92);
+    backdrop-filter: blur(10px);
+    border-top: 1px solid #EEF1FB;
+    padding: 8px 0 18px;
+  }
+  .tab {
+    border: none; background: transparent;
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+    font-family: inherit; font-size: 10px;
+    color: var(--text-sub);
+    cursor: pointer;
+    transition: color .15s ease;
+  }
+  .tab svg { width: 22px; height: 22px; }
+  .tab.active { color: var(--primary); font-weight: 700; }
+
+  /* ==================== 弹层 & 提示 ==================== */
+  .mask {
+    position: absolute; inset: 0;
+    background: rgba(31, 42, 90, .4);
+    backdrop-filter: blur(3px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+    z-index: 100;
+    transition: opacity .2s ease;
+  }
+  .mask.hidden { visibility: hidden; opacity: 0; pointer-events: none; }
+  .dialog {
+    width: 100%; max-width: 320px; max-height: 460px;
+    background: var(--bg);
+    border-radius: 18px;
+    padding: 12px;
+    display: flex; flex-direction: column;
+    box-shadow: 0 18px 40px rgba(31,42,90,.25);
+    transform: scale(1);
+    transition: transform .2s ease;
+  }
+  .mask.hidden .dialog { transform: scale(.94); }
+  .dialog-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 6px 10px;
+  }
+  .dialog-head h3 { margin: 0; font-size: 15px; font-weight: 800; }
+  .icon-close {
+    border: none; background: #F2F4FD;
+    width: 26px; height: 26px; border-radius: 8px;
+    font-size: 16px; color: var(--text-sub);
+    cursor: pointer;
+  }
+  .dialog-body { overflow-y: auto; padding: 0 2px; }
+  .result-item {
+    background: #fff; border-radius: 12px; padding: 11px 13px;
+    margin-bottom: 8px;
+    box-shadow: var(--shadow-sm);
+  }
+  .result-item .r-name { font-size: 12px; font-weight: 700; margin-bottom: 3px; line-height: 1.4; }
+  .result-item .r-meta { font-size: 10px; color: var(--text-sub); }
+
+  .toast {
+    position: absolute; left: 50%; bottom: 90px;
+    transform: translateX(-50%) translateY(8px);
+    background: rgba(31,42,90,.92);
+    color: #fff;
+    font-size: 12px;
+    padding: 9px 18px;
+    border-radius: 22px;
+    opacity: 0;
+    transition: opacity .25s ease, transform .25s ease;
+    pointer-events: none;
+    z-index: 200;
+    max-width: 280px;
+    text-align: center;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 430px) {
+    body { padding: 0; background: var(--bg); }
+    .phone {
+      width: 100%; height: 100vh;
+      max-height: 100vh;
+    }
+  }
+</style>
+</head>
+<body>
+  <div class="phone">
+    <!-- 开屏页 -->
+    <section class="splash" id="splash">
+      <div class="skyline"></div>
+      <div class="water"></div>
+      <div class="logo-wrap">
+        <svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+          <defs>
+            <linearGradient id="lg1" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#7C86F3"/>
+              <stop offset="1" stop-color="#5B67E8"/>
+            </linearGradient>
+            <linearGradient id="lg2" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#B8A6F5"/>
+              <stop offset="1" stop-color="#8B7BF5"/>
+            </linearGradient>
+          </defs>
+          <path d="M60 12 L100 48 L80 48 L80 100 L40 100 L40 48 L20 48 Z" fill="url(#lg1)" opacity=".95"/>
+          <rect x="46" y="62" width="12" height="38" fill="#fff" opacity=".45"/>
+          <rect x="62" y="62" width="12" height="26" fill="#fff" opacity=".35"/>
+          <path d="M60 4 Q80 18 76 44 L44 44 Q40 18 60 4 Z" fill="url(#lg2)"/>
+          <path d="M30 54 Q60 40 90 54 L90 62 Q60 48 30 62 Z" fill="#fff" opacity=".55"/>
+        </svg>
+      </div>
+      <h1>发现好活动，<br>看见新可能</h1>
+      <div class="sub">会 展 · 文 化 · 生 活 · 未 来</div>
+      <button class="start-btn" id="startBtn">
+        开启旅程
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </button>
+    </section>
+
+    <!-- 应用 -->
+    <div class="app hidden" id="app">
+      <div class="views">
+        <!-- 首页 -->
+        <section class="view active" data-view="home">
+          <div class="top-pad"></div>
+          <div class="home-top">
+            <div class="loc-row">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-7.5-8-13a8 8 0 1 1 16 0c0 5.5-8 13-8 13z"/><circle cx="12" cy="9" r="3"/></svg>
+              <span>杭州</span>
+              <span class="caret">▼</span>
+            </div>
+            <div class="search-bar">
+              <svg id="searchIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+              <input type="text" id="searchInput" placeholder="搜索活动 / 场馆 / 关键词">
+            </div>
+          </div>
+          <div class="view-body">
+            <div class="banner" id="banner"></div>
+            <div class="modules" id="modules"></div>
+            <div class="section-head">
+              <h2>热门推荐</h2>
+              <span class="more">更多 ›</span>
+            </div>
+            <div id="exhList"></div>
+          </div>
+        </section>
+
+        <!-- 地图 -->
+        <section class="view map-page" data-view="map">
+          <div class="view-body map-body">
+            <div id="map"></div>
+            <div class="map-fallback" id="mapFallback"></div>
+          </div>
+          <div class="map-top">
+            <div class="map-seg">
+              <button class="on" data-mapmode="map">地图</button>
+              <button data-mapmode="calendar">展历</button>
+            </div>
+          </div>
+          <div class="map-legend">
+            <div class="row"><span class="dot" style="background:var(--primary)"></span>正在展</div>
+            <div class="row"><span class="dot" style="background:var(--orange)"></span>即将开展</div>
+            <div class="row"><span class="dot" style="background:var(--red)"></span>即将撤展</div>
+            <div class="row"><span class="dot" style="background:var(--text-muted)"></span>暂无活动</div>
+          </div>
+          <div class="map-zoom">
+            <button class="map-compass" aria-label="指南针">◎</button>
+            <button id="zoomIn" aria-label="放大">+</button>
+            <button id="zoomOut" aria-label="缩小">−</button>
+          </div>
+        </section>
+
+        <!-- 展历 -->
+        <section class="view" data-view="calendar">
+          <div class="top-pad"></div>
+          <div class="cal-topbar">
+            <h2>展历</h2>
+            <button class="cal-today" id="calToday" aria-label="今天">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="9" opacity=".4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2"/></svg>
+            </button>
+          </div>
+          <div class="view-body">
+            <div class="cal-head">
+              <div class="month" id="calMonth"></div>
+              <div class="cal-navs">
+                <button class="cal-nav" id="calPrev">‹</button>
+                <button class="cal-nav" id="calNext">›</button>
+              </div>
+            </div>
+            <div class="cal-week">
+              <span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span><span>日</span>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+            <div class="cal-legend">
+              <div class="row"><span class="dot" style="background:var(--primary)"></span>开展日</div>
+              <div class="row"><span class="dot" style="background:var(--green)"></span>展出中</div>
+              <div class="row"><span class="dot" style="background:var(--orange)"></span>撤展日</div>
+            </div>
+            <h3 class="cal-detail-title" id="calDetailTitle">当天展会</h3>
+            <div id="calDetail"></div>
+          </div>
+        </section>
+
+        <!-- 热门活动 -->
+        <section class="view" data-view="hot">
+          <div class="top-pad"></div>
+          <div class="subbar">
+            <h2>热门活动</h2>
+            <span class="sub-note">按评分排序</span>
+          </div>
+          <div class="view-body">
+            <div id="hotList"></div>
+          </div>
+        </section>
+
+        <!-- 我的收藏 -->
+        <section class="view" data-view="favorite">
+          <div class="top-pad"></div>
+          <div class="subbar">
+            <h2>我的收藏</h2>
+            <span class="sub-note" id="favCountNote"></span>
+          </div>
+          <div class="view-body">
+            <div id="favList"></div>
+          </div>
+        </section>
+
+        <!-- 社区 -->
+        <section class="view" data-view="community">
+          <div class="community-head">
+            <h2>社区</h2>
+            <button class="add-btn" id="addPostBtn">+</button>
+          </div>
+          <div class="tabs">
+            <button class="on">推荐</button>
+            <button>关注</button>
+            <button>杭州</button>
+            <button>话题</button>
+          </div>
+          <div class="view-body" style="padding-top:0">
+            <div id="postList"></div>
+          </div>
+          <button class="fab" id="fabPost" aria-label="发布点评">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+          </button>
+        </section>
+
+        <!-- 我的 -->
+        <section class="view" data-view="mine">
+          <div class="view-body mine-body" style="padding-bottom:90px">
+            <div class="mine-header">
+              <div class="mine-header-bar">
+                <h2>我的</h2>
+                <button class="gear" aria-label="设置">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+                </button>
+              </div>
+              <div class="profile-card">
+                <div class="mine-head">
+                  <div class="avatar" id="avatar"></div>
+                  <div>
+                    <div class="mine-name">
+                      云朵收藏家
+                      <span class="lv-badge">Lv.3</span>
+                    </div>
+                    <div class="mine-sub">热爱展览的生活家</div>
+                  </div>
+                </div>
+                <div class="stats">
+                  <div><strong>32</strong><span>关注</span></div>
+                  <div><strong>186</strong><span>粉丝</span></div>
+                  <div><strong>428</strong><span>获赞</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="dual-cards">
+              <div class="dual-card purple" data-go="favorite">
+                <div class="dc-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.5L12 17.8 6.1 20.1l1.2-6.5L2.5 9l6.6-.9L12 2z"/></svg>
+                </div>
+                <div>
+                  <div class="dc-title">想去清单</div>
+                  <div class="dc-count" id="wantCount">0 个展会</div>
+                </div>
+                <span class="dc-arrow">›</span>
+              </div>
+              <div class="dual-card blue">
+                <div class="dc-icon">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+                </div>
+                <div>
+                  <div class="dc-title">去过清单</div>
+                  <div class="dc-count">28 个展会</div>
+                </div>
+                <span class="dc-arrow">›</span>
+              </div>
+            </div>
+            <div class="shortcuts">
+              <button class="shortcut" data-go="favorite">
+                <span class="sc-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></span>
+                <span>我的点评</span>
+              </button>
+              <button class="shortcut" data-go="favorite">
+                <span class="sc-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.5L12 17.8 6.1 20.1l1.2-6.5L2.5 9l6.6-.9L12 2z"/></svg></span>
+                <span>我的收藏</span>
+              </button>
+              <button class="shortcut">
+                <span class="sc-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18M3 12h18M3 17h18"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg></span>
+                <span>开票提醒</span>
+              </button>
+              <button class="shortcut">
+                <span class="sc-ic"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
+                <span>看展足迹</span>
+              </button>
+            </div>
+            <div class="menu">
+              <button>
+                <span class="m-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
+                消息通知
+                <span class="menu-status">已开启</span>
+                <span class="arrow">›</span>
+              </button>
+              <button>
+                <span class="m-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></span>
+                帮助与反馈
+                <span class="arrow">›</span>
+              </button>
+              <button>
+                <span class="m-ic"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
+                关于我们
+                <span class="arrow">›</span>
+              </button>
+            </div>
+          </div>
+        </section>
+        <!-- 展览详情 -->
+        <section class="view detail-page" data-view="detail">
+          <div class="detail-topbar">
+            <button class="detail-icon-btn" id="detailBack" aria-label="返回">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <div class="detail-icon-btn right">
+              <button class="ib" id="detailFav" aria-label="收藏">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.5L12 17.8 6.1 20.1l1.2-6.5L2.5 9l6.6-.9L12 2z"/></svg>
+              </button>
+              <button class="ib" id="detailShare" aria-label="分享">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>
+              </button>
+            </div>
+          </div>
+          <div class="view-body" style="padding:0; padding-bottom:0">
+            <div class="detail-hero" id="detailHero"></div>
+            <div class="detail-body" id="detailBody"></div>
+          </div>
+        </section>
+
+        <!-- 提醒开票 -->
+        <section class="view" data-view="remind">
+          <div class="top-pad"></div>
+          <div class="subbar" style="justify-content:space-between">
+            <h2 id="remindTitle">活动列表</h2>
+            <button class="cal-today" id="remindClose" aria-label="关闭" style="width:30px;height:30px;border-radius:8px">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          </div>
+          <div class="view-body">
+            <div class="filter-tabs" id="remindTabs">
+              <button class="on" data-filter="all">全部</button>
+              <button data-filter="ongoing">进行中</button>
+              <button data-filter="upcoming">即将开展</button>
+              <button data-filter="ending">即将撤展</button>
+            </div>
+            <div id="remindList"></div>
+            <div class="remind-panel">
+              <div class="remind-row">
+                <div class="remind-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18M3 12h18M3 17h18"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+                </div>
+                <div class="remind-text">
+                  <div class="rt-title">开票提醒</div>
+                  <div class="rt-sub">开票时间 2025-10-10 10:00</div>
+                </div>
+                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+              </div>
+              <div class="remind-row">
+                <div class="remind-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                </div>
+                <div class="remind-text">
+                  <div class="rt-title">撤展倒计时</div>
+                  <div class="rt-sub">3 天</div>
+                </div>
+                <label class="switch"><input type="checkbox" checked><span class="slider"></span></label>
+              </div>
+              <button class="add-schedule-btn">+ 添加到我的日程</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- 去这里 -->
+        <section class="view" data-view="gohere">
+          <div class="top-pad"></div>
+          <div class="subbar">
+            <button class="detail-icon-btn" id="gohereBack" style="width:32px;height:32px;background:#fff;box-shadow:none" aria-label="返回">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            </button>
+            <h2 id="gohereTitle">前往 · 场馆</h2>
+          </div>
+          <div class="view-body" style="padding:0 16px 100px">
+            <div class="nav-map" id="navMap"></div>
+            <div class="nav-tabs">
+              <button class="on" data-nav="taxi">打车</button>
+              <button data-nav="transit">公共交通</button>
+              <button data-nav="walk">步行</button>
+            </div>
+            <div class="nav-options" id="navOptions"></div>
+            <button class="nav-view-btn">在应用内查看路线</button>
+            <div class="nav-note">※ 也可一键唤起高德地图导航</div>
+          </div>
+        </section>
+      </div>
+
+      <nav class="tabbar" id="tabbar"></nav>
+    </div>
+
+    <!-- 弹层 -->
+    <div class="mask hidden" id="mask">
+      <div class="dialog" id="dialog"></div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script>
+  (function () {
+    "use strict";
+
+    /* ====================== 数据 ====================== */
+
+    var EXHIBITIONS = [
+      { id: "exh_led", name: "2026杭州国际灯具灯饰及LED照明博览会",
+        date: "2026-10-24 ~ 2026-10-26", venue: "杭州大会展中心",
+        tag: "智能科技", rating: 8.8, img: "lighting" },
+      { id: "exh_textile", name: "2026杭州国际纺织服装服饰博览会",
+        date: "2026-10-29 ~ 2026-10-31", venue: "杭州大会展中心",
+        tag: "服装时尚", rating: 8.6, img: "fashion" },
+      { id: "exh_garden", name: "2026第十届杭州国际园林景观产业展览会",
+        date: "2026-11-06 ~ 2026-11-08", venue: "杭州大会展中心",
+        tag: "园林景观", rating: 8.9, img: "garden" },
+      { id: "exh_optics", name: "2026杭州国际光电博览会",
+        date: "2026-11-11 ~ 2026-11-13", venue: "杭州大会展中心",
+        tag: "光电科技", rating: 9.0, img: "optics" },
+      { id: "exh_dental", name: "2026华东国际口腔博览会",
+        date: "2026-11-20 ~ 2026-11-22", venue: "杭州国际博览中心",
+        tag: "医疗健康", rating: 8.7, img: "dental" },
+      { id: "exh_beauty", name: "2027杭州美妆创新展 CiE",
+        date: "2027-03-04 ~ 2027-03-06", venue: "杭州国际博览中心",
+        tag: "美妆个护", rating: 9.1, img: "beauty" }
+    ];
+
+    var VENUES = {
+      "杭州大会展中心": { lat: 30.2456, lng: 120.3398, addr: "萧山区南阳街道港城大道" },
+      "杭州国际博览中心": { lat: 30.2321, lng: 120.2288, addr: "萧山区钱江世纪城奔竞大道" }
+    };
+
+    var POSTS = [
+      { user: "小柚子", time: "2 小时前", avatar: "girl",
+        text: "今天去了杭州国际数字文旅展，真的太震撼了！科技和艺术的结合让人眼前一亮～",
+        imgs: ["c1","c2","c3"], tag: "#杭州国际数字文旅展",
+        likes: 128, comments: 34, shares: 12 },
+      { user: "旅行的意义", time: "5 小时前", avatar: "man",
+        text: "在展会上遇到好多有趣的展商，已经开始期待下次的活动了！",
+        imgs: ["c4","c5","c6"], tag: "#展会打卡",
+        likes: 86, comments: 18, shares: 6 }
+    ];
+
+    var MODULES = [
+      { name: "地图", target: "map", icon: "map" },
+      { name: "展历", target: "calendar", icon: "cal" },
+      { name: "热门活动", target: "hot", icon: "star" },
+      { name: "我的收藏", target: "favorite", icon: "heart" }
+    ];
+
+    var TABS = [
+      { name: "首页", target: "home", icon: "home" },
+      { name: "地图", target: "map", icon: "map" },
+      { name: "社区", target: "community", icon: "chat" },
+      { name: "我的", target: "mine", icon: "user" }
+    ];
+
+    /* ====================== 图片占位 ====================== */
+
+    function imgSrc(seed, w, h) {
+      return "https://picsum.photos/seed/" + encodeURIComponent(seed) + "/" + (w || 200) + "/" + (h || 200);
+    }
+
+    /* ====================== 工具函数 ====================== */
+
+    function pad(n) { return n < 10 ? "0" + n : "" + n; }
+    function toDate(str) { var p = str.split("-").map(Number); return new Date(p[0], p[1]-1, p[2]); }
+    function dayKey(d) { return d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate()); }
+    function startDate(ex) { return toDate(ex.date.split(" ~ ")[0]); }
+    function endDate(ex) { return toDate(ex.date.split(" ~ ")[1]); }
+
+    function statusOf(ex) {
+      var today = new Date(); today.setHours(0,0,0,0);
+      var s = startDate(ex), e = endDate(ex);
+      s.setHours(0,0,0,0); e.setHours(0,0,0,0);
+      if (today >= s && today <= e) {
+        // 即将撤展：距结束日 3 天内
+        var diffDays = Math.ceil((e - today) / 86400000);
+        if (diffDays <= 3) return "ending";
+        return "ongoing";
+      }
+      if (today < s) return "upcoming";
+      return "ended";
+    }
+
+    var STATUS_TEXT = { ongoing: "正在展", upcoming: "即将开展", ending: "即将撤展", ended: "已结束" };
+
+    /* 每一天对应的展会 */
+    var coverage = {};
+    EXHIBITIONS.forEach(function (ex) {
+      var d = startDate(ex);
+      var end = endDate(ex);
+      while (d <= end) {
+        var k = dayKey(d);
+        (coverage[k] = coverage[k] || []).push(ex);
+        d = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+      }
+    });
+
+    /* ====================== 收藏 ====================== */
+
+    var FAV_KEY = "exh_favorites_v1";
+    var favFallback = [];
+    var favorites = readFavorites();
+
+    function readFavorites() {
+      try { var raw = localStorage.getItem(FAV_KEY); return raw ? JSON.parse(raw) : []; }
+      catch (e) { return favFallback.slice(); }
+    }
+    function saveFavorites() {
+      try { localStorage.setItem(FAV_KEY, JSON.stringify(favorites)); }
+      catch (e) { favFallback = favorites.slice(); }
+    }
+    function isFavorite(id) { return favorites.indexOf(id) !== -1; }
+
+    function toggleFavorite(ex) {
+      var i = favorites.indexOf(ex.id);
+      if (i === -1) { favorites.push(ex.id); showToast("已收藏 · " + ex.name); }
+      else { favorites.splice(i, 1); showToast("已取消收藏"); }
+      saveFavorites();
+      refreshStars();
+      if (currentView === "favorite") renderFavorites();
+      if (currentView === "mine") renderMine();
+    }
+
+    /* ====================== 通用组件 ====================== */
+
+    function makeCard(ex, opts) {
+      opts = opts || {};
+      var card = document.createElement("article");
+      card.className = opts.hot ? "hot-card" : "exh-card";
+
+      var thumb = document.createElement("div");
+      thumb.className = "exh-thumb";
+      var img = document.createElement("img");
+      img.loading = "lazy";
+      img.src = imgSrc(ex.img, 200, 200);
+      img.alt = ex.name;
+      img.onerror = function () { img.style.display = "none"; };
+      thumb.appendChild(img);
+
+      var badge = document.createElement("span");
+      badge.className = "status-badge " + statusOf(ex);
+      badge.textContent = STATUS_TEXT[statusOf(ex)];
+      thumb.appendChild(badge);
+
+      if (opts.hot) {
+        var rank = document.createElement("span");
+        rank.className = "hot-rank";
+        rank.textContent = opts.rank;
+        thumb.appendChild(rank);
+      }
+
+      var info = document.createElement("div");
+      info.className = "exh-info";
+
+      var name = document.createElement("div");
+      name.className = "name";
+      name.textContent = ex.name;
+
+      var meta = document.createElement("div");
+      meta.className = "meta";
+      meta.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>' +
+        '<span>' + ex.date + '</span><span style="margin:0 4px">·</span>' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-7.5-8-13a8 8 0 1 1 16 0c0 5.5-8 13-8 13z"/><circle cx="12" cy="9" r="3"/></svg>' +
+        '<span>' + ex.venue + '</span>';
+
+      var bottomRow = document.createElement("div");
+      bottomRow.className = "bottom-row";
+
+      var rating = document.createElement("span");
+      rating.className = "rating";
+      rating.innerHTML = '<svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.5L12 17.8 6.1 20.1l1.2-6.5L2.5 9l6.6-.9L12 2z"/></svg>' + ex.rating;
+
+      var fav = document.createElement("button");
+      fav.className = "fav-btn" + (isFavorite(ex.id) ? " on" : "");
+      fav.type = "button";
+      fav.setAttribute("data-fav-id", ex.id);
+      fav.textContent = isFavorite(ex.id) ? "★" : "☆";
+      fav.addEventListener("click", function (ev) { ev.stopPropagation(); toggleFavorite(ex); });
+
+      bottomRow.appendChild(rating);
+      bottomRow.appendChild(fav);
+
+      info.appendChild(name);
+      info.appendChild(meta);
+      info.appendChild(bottomRow);
+
+      card.appendChild(thumb);
+      card.appendChild(info);
+      card.addEventListener("click", function () { openDetail(ex); });
+      return card;
+    }
+
+    function refreshStars() {
+      var btns = document.querySelectorAll(".fav-btn");
+      for (var i = 0; i < btns.length; i++) {
+        var id = btns[i].getAttribute("data-fav-id");
+        var on = isFavorite(id);
+        btns[i].classList.toggle("on", on);
+        btns[i].textContent = on ? "★" : "☆";
+      }
+    }
+
+    /* ====================== 开屏 & Banner ====================== */
+
+    var splash = document.getElementById("splash");
+    var app = document.getElementById("app");
+    var splashTimer = null;
+
+    function enterHome() {
+      if (splashTimer) { clearTimeout(splashTimer); splashTimer = null; }
+      splash.classList.add("hidden");
+      app.classList.remove("hidden");
+      setTimeout(ensureFit, 60);
+    }
+
+    document.getElementById("startBtn").addEventListener("click", enterHome);
+    splashTimer = setTimeout(enterHome, 2500);
+
+    function renderBanner() {
+      var el = document.getElementById("banner");
+      // 选评分最高的做 banner
+      var ex = EXHIBITIONS.slice().sort(function (a, b) { return b.rating - a.rating; })[0];
+      el.innerHTML =
+        '<div class="bg"><img src="' + imgSrc(ex.img, 600, 300) + '" alt=""></div>' +
+        '<div class="shade"></div>' +
+        '<div class="content">' +
+          '<div><div class="venue-tag">' + ex.venue + '</div>' +
+          '<div class="title">' + ex.name + '</div></div>' +
+          '<div class="bottom"><span class="date-chip">' + ex.date.replace(/20(\d{2})-/g, "$1.") + '</span>' +
+          '<button class="detail-btn" data-go="hot">查看详情</button></div>' +
+        '</div>';
+      el.querySelector(".detail-btn").addEventListener("click", function () { go("hot"); });
+    }
+    renderBanner();
+
+    /* ====================== 首页构建 ====================== */
+
+    var modulesEl = document.getElementById("modules");
+    var ICONS = {
+      map: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3 3 5v16l6-2 6 2 6-2V3l-6 2-6-2z"/><path d="M9 3v16M15 5v16"/></svg>',
+      cal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+      star: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.5L12 17.8 6.1 20.1l1.2-6.5L2.5 9l6.6-.9L12 2z"/></svg>',
+      heart: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>'
+    };
+    MODULES.forEach(function (m, idx) {
+      var btn = document.createElement("button");
+      btn.className = "module-btn";
+      btn.type = "button";
+      btn.innerHTML = '<span class="ic c' + (idx + 1) + '">' + ICONS[m.icon] + '</span><span>' + m.name + '</span>';
+      btn.addEventListener("click", function () { go(m.target); });
+      modulesEl.appendChild(btn);
+    });
+
+    var exhList = document.getElementById("exhList");
+    EXHIBITIONS.forEach(function (ex) { exhList.appendChild(makeCard(ex)); });
+
+    /* ====================== 底部导航 ====================== */
+
+    var TAB_ICONS = {
+      home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg>',
+      map: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3 3 5v16l6-2 6 2 6-2V3l-6 2-6-2z"/><path d="M9 3v16M15 5v16"/></svg>',
+      chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
+      user: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>'
+    };
+
+    var tabbar = document.getElementById("tabbar");
+    TABS.forEach(function (t) {
+      var btn = document.createElement("button");
+      btn.className = "tab" + (t.target === "home" ? " active" : "");
+      btn.type = "button";
+      btn.setAttribute("data-target", t.target);
+      btn.innerHTML = TAB_ICONS[t.icon] + "<span>" + t.name + "</span>";
+      btn.addEventListener("click", function () { go(t.target); });
+      tabbar.appendChild(btn);
+    });
+
+    /* ====================== 视图切换 ====================== */
+
+    var currentView = "home";
+    var prevView = "home";
+    var detailEx = null;
+    var TAB_FOR_VIEW = {
+      home: "home", map: "map", community: "community", mine: "mine",
+      calendar: "home", hot: "home", favorite: "mine",
+      detail: null, remind: null, gohere: null
+    };
+
+    function go(name) {
+      prevView = currentView;
+      currentView = name;
+      var views = document.querySelectorAll(".view");
+      for (var i = 0; i < views.length; i++) {
+        views[i].classList.toggle("active", views[i].getAttribute("data-view") === name);
+      }
+      var tabTarget = TAB_FOR_VIEW[name];
+      var tabs = tabbar.querySelectorAll(".tab");
+      for (var j = 0; j < tabs.length; j++) {
+        tabs[j].classList.toggle("active", tabTarget && tabs[j].getAttribute("data-target") === tabTarget);
+      }
+      var activeView = document.querySelector('.view[data-view="' + name + '"] .view-body');
+      if (activeView) activeView.scrollTop = 0;
+
+      if (name === "map") { setTimeout(initMap, 30); setMapMode("map"); }
+      if (name === "calendar") renderCalendar();
+      if (name === "hot") renderHot();
+      if (name === "favorite") renderFavorites();
+      if (name === "mine") renderMine();
+      if (name === "community") renderPosts();
+      if (name === "remind") renderRemind();
+      if (name === "gohere") renderGohere();
+    }
+
+    function openDetail(ex) {
+      detailEx = ex;
+      renderDetail();
+      go("detail");
+    }
+
+    function goBack() {
+      go(prevView || "home");
+    }
+
+    document.querySelectorAll("[data-go]").forEach(function (el) {
+      el.addEventListener("click", function () { go(this.getAttribute("data-go")); });
+    });
+
+    /* ====================== 地图 ====================== */
+
+    var mapObj = null, mapReady = false;
+
+    function setMapMode(mode) {
+      document.querySelectorAll(".map-seg button").forEach(function (b) {
+        b.classList.toggle("on", b.getAttribute("data-mapmode") === mode);
+      });
+      if (mode === "calendar") go("calendar");
+    }
+    document.querySelectorAll(".map-seg button").forEach(function (b) {
+      b.addEventListener("click", function () { setMapMode(this.getAttribute("data-mapmode")); });
+    });
+
+    function initMap() {
+      if (mapReady) { if (mapObj) mapObj.invalidateSize(); return; }
+      var container = document.getElementById("map");
+      if (!window.L) { showMapFallback(); return; }
+      mapReady = true;
+      try {
+        mapObj = L.map(container, { scrollWheelZoom: false, zoomControl: false }).setView([30.24, 120.285], 11);
+        L.tileLayer("https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}", {
+          subdomains: ["1","2","3","4"], maxZoom: 18, attribution: "© 高德地图"
+        }).addTo(mapObj);
+
+        var points = [];
+        Object.keys(VENUES).forEach(function (venueName) {
+          var venue = VENUES[venueName];
+          var venueEx = EXHIBITIONS.filter(function (e) { return e.venue === venueName; });
+          // 用该场馆下最接近的展会状态决定标记颜色
+          var st = "ended";
+          for (var i = 0; i < venueEx.length; i++) {
+            var s = statusOf(venueEx[i]);
+            if (s === "ongoing") { st = "ongoing"; break; }
+            if (s === "ending") { st = "ending"; }
+            else if (s === "upcoming" && st !== "ending") st = "upcoming";
+          }
+          var icon = L.divIcon({
+            className: "venue-pin " + st,
+            html: "<span></span>",
+            iconSize: [26, 26],
+            iconAnchor: [13, 26],
+            popupAnchor: [0, -26]
+          });
+          var top = venueEx.slice().sort(function (a, b) { return b.rating - a.rating; })[0];
+          var html =
+            '<div class="pop-card">' +
+              '<div class="pop-thumb"><img src="' + imgSrc(top.img, 120, 120) + '" alt=""></div>' +
+              '<div class="pop-info">' +
+                '<div class="v-name">' + venueName + '</div>' +
+                '<div class="e-name">' + top.name + '</div>' +
+                '<div class="row2"><span class="date">' + top.date + '</span><span class="rating">★ ' + top.rating + '</span></div>' +
+                '<button class="go-btn" data-exid="' + top.id + '">去这里</button>' +
+              '</div>' +
+            '</div>';
+          var marker = L.marker([venue.lat, venue.lng], { icon: icon, title: venueName })
+            .addTo(mapObj)
+            .bindPopup(html, { closeButton: false, offset: [0, -6] });
+          marker.on("popupopen", function () {
+            var btn = document.querySelector(".leaflet-popup-content .go-btn");
+            if (btn) {
+              btn.addEventListener("click", function (e) {
+                e.stopPropagation();
+                var exid = btn.getAttribute("data-exid");
+                var ex = EXHIBITIONS.find(function (e) { return e.id === exid; });
+                if (ex) openDetail(ex);
+              });
+            }
+          });
+          points.push([venue.lat, venue.lng]);
+        });
+        if (points.length) mapObj.fitBounds(points, { padding: [50, 50], maxZoom: 13 });
+        setTimeout(function () { mapObj.invalidateSize(); }, 80);
+      } catch (e) { showMapFallback(); }
+    }
+
+    document.getElementById("zoomIn").addEventListener("click", function () { if (mapObj) mapObj.zoomIn(); });
+    document.getElementById("zoomOut").addEventListener("click", function () { if (mapObj) mapObj.zoomOut(); });
+
+    function showMapFallback() {
+      document.getElementById("map").style.display = "none";
+      var fb = document.getElementById("mapFallback");
+      fb.style.display = "block";
+      if (fb.childElementCount) return;
+      Object.keys(VENUES).forEach(function (venueName) {
+        var venue = VENUES[venueName];
+        var card = document.createElement("div");
+        card.className = "venue-card";
+        card.innerHTML = '<h4>' + venueName + '</h4><div class="v-addr">' + venue.addr + '</div>';
+        EXHIBITIONS.filter(function (ex) { return ex.venue === venueName; }).forEach(function (ex) {
+          var row = document.createElement("div");
+          row.className = "venue-ex";
+          row.textContent = ex.name;
+          var em = document.createElement("em");
+          em.textContent = ex.date;
+          row.appendChild(em);
+          card.appendChild(row);
+        });
+        fb.appendChild(card);
+      });
+    }
+
+    function ensureFit() {
+      if (mapObj) mapObj.invalidateSize();
+    }
+
+    /* ====================== 展历 ====================== */
+
+    var calYear = null, calMonth = null, calSelected = null;
+
+    function monthPrefix(y, m) { return y + "-" + pad(m + 1); }
+    function firstCoveredDay(y, m) {
+      var prefix = monthPrefix(y, m) + "-";
+      var keys = Object.keys(coverage).filter(function (k) { return k.indexOf(prefix) === 0; }).sort();
+      return keys.length ? keys[0] : null;
+    }
+
+    function pickMonth() {
+      var today = new Date();
+      var y = today.getFullYear(), m = today.getMonth();
+      var prefix = monthPrefix(y, m);
+      var has = Object.keys(coverage).some(function (k) { return k.indexOf(prefix) === 0; });
+      if (has) return { y: y, m: m };
+      var sorted = EXHIBITIONS.slice().sort(function (a, b) { return startDate(a) - startDate(b); });
+      var target = null;
+      for (var i = 0; i < sorted.length; i++) {
+        if (endDate(sorted[i]) >= today) { target = sorted[i]; break; }
+      }
+      if (!target) target = sorted[sorted.length - 1];
+      var d = startDate(target);
+      return { y: d.getFullYear(), m: d.getMonth() };
+    }
+
+    function moveMonth(delta) {
+      calMonth += delta;
+      if (calMonth < 0) { calMonth = 11; calYear--; }
+      if (calMonth > 11) { calMonth = 0; calYear++; }
+      calSelected = firstCoveredDay(calYear, calMonth);
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      if (calYear === null) {
+        var p = pickMonth();
+        calYear = p.y; calMonth = p.m;
+        var todayKey = dayKey(new Date());
+        calSelected = coverage[todayKey] ? todayKey : firstCoveredDay(calYear, calMonth);
+      }
+      document.getElementById("calMonth").textContent = calYear + "年" + (calMonth + 1) + "月";
+      var grid = document.getElementById("calGrid");
+      grid.innerHTML = "";
+      // 周一开始：周日(0)→6, 周一(1)→0 ...
+      var firstWeekday = new Date(calYear, calMonth, 1).getDay();
+      firstWeekday = firstWeekday === 0 ? 6 : firstWeekday - 1;
+      var daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+      var today = dayKey(new Date());
+      for (var i = 0; i < firstWeekday; i++) {
+        var blank = document.createElement("button");
+        blank.className = "cal-day blank"; blank.type = "button"; blank.disabled = true;
+        grid.appendChild(blank);
+      }
+      for (var day = 1; day <= daysInMonth; day++) {
+        (function (dayNum) {
+          var key = calYear + "-" + pad(calMonth + 1) + "-" + pad(dayNum);
+          var cell = document.createElement("button");
+          cell.className = "cal-day"; cell.type = "button";
+          var list = coverage[key] || [];
+          var dotClass = "";
+          if (list.length) {
+            var hasStart = false, hasEnd = false;
+            list.forEach(function (ex) {
+              if (dayKey(startDate(ex)) === key) hasStart = true;
+              if (dayKey(endDate(ex)) === key) hasEnd = true;
+            });
+            if (hasStart) dotClass = "start";
+            else if (hasEnd) dotClass = "end";
+            else dotClass = "middle";
+          }
+          cell.innerHTML = '<span>' + dayNum + '</span><span class="cal-dot ' + dotClass + '"></span>';
+          if (key === today) cell.classList.add("today");
+          if (key === calSelected) cell.classList.add("selected");
+          cell.addEventListener("click", function () { calSelected = key; renderCalendar(); });
+          grid.appendChild(cell);
+        })(day);
+      }
+      renderCalendarDetail();
+    }
+
+    function renderCalendarDetail() {
+      var detail = document.getElementById("calDetail");
+      var title = document.getElementById("calDetailTitle");
+      detail.innerHTML = "";
+      if (!calSelected) {
+        title.textContent = "当天展会";
+        var tip = document.createElement("div");
+        tip.className = "empty-tip";
+        tip.textContent = "本月暂无展会安排，可切换月份查看";
+        detail.appendChild(tip);
+        return;
+      }
+      var parts = calSelected.split("-");
+      title.textContent = parts[1] + "月" + parts[2] + "日 展会";
+      var list = coverage[calSelected];
+      if (!list || !list.length) {
+        var empty = document.createElement("div");
+        empty.className = "empty-tip";
+        empty.textContent = "当天没有展会安排";
+        detail.appendChild(empty);
+        return;
+      }
+      list.forEach(function (ex) {
+        var item = document.createElement("div");
+        item.className = "day-item";
+        var st = statusOf(ex);
+        var badgeColor = { ongoing: "var(--green)", upcoming: "var(--orange)", ending: "var(--red)", ended: "var(--text-muted)" }[st];
+        var eDate = endDate(ex);
+        var today = new Date(); today.setHours(0,0,0,0);
+        var daysLeft = Math.ceil((eDate - today) / 86400000);
+        var countdown = "";
+        if (st === "ongoing" || st === "ending") {
+          countdown = '<span class="d-countdown">撤展倒计时 ' + daysLeft + ' 天</span>';
+        }
+        item.innerHTML =
+          '<div class="d-head">' +
+            '<div class="d-name">' + ex.name + '</div>' +
+            '<span class="d-status" style="background:' + badgeColor + '">' + STATUS_TEXT[st] + '</span>' +
+          '</div>' +
+          '<div class="d-meta">' + ex.date + '  |  ' + ex.venue + '</div>' +
+          '<div class="d-actions">' +
+            '<button class="remind-btn" data-remind="' + ex.id + '">开票提醒</button>' +
+            countdown +
+          '</div>';
+        item.style.cursor = "pointer";
+        item.addEventListener("click", function () { openDetail(ex); });
+        var rb = item.querySelector(".remind-btn");
+        if (rb) rb.addEventListener("click", function (e) { e.stopPropagation(); go("remind"); });
+        detail.appendChild(item);
+      });
+    }
+
+    document.getElementById("calPrev").addEventListener("click", function () { moveMonth(-1); });
+    document.getElementById("calNext").addEventListener("click", function () { moveMonth(1); });
+    document.getElementById("calToday").addEventListener("click", function () {
+      var now = new Date();
+      calYear = now.getFullYear(); calMonth = now.getMonth();
+      calSelected = dayKey(now);
+      renderCalendar();
+    });
+
+    /* ====================== 热门活动 ====================== */
+
+    function renderHot() {
+      var el = document.getElementById("hotList");
+      el.innerHTML = "";
+      var sorted = EXHIBITIONS.slice().sort(function (a, b) { return b.rating - a.rating; });
+      sorted.forEach(function (ex, idx) { el.appendChild(makeCard(ex, { hot: true, rank: idx + 1 })); });
+    }
+
+    /* ====================== 我的收藏 ====================== */
+
+    function renderFavorites() {
+      var el = document.getElementById("favList");
+      el.innerHTML = "";
+      document.getElementById("favCountNote").textContent = "共 " + favorites.length + " 场";
+      if (!favorites.length) {
+        var empty = document.createElement("div");
+        empty.className = "empty-tip";
+        empty.textContent = "还没有收藏的展会\n去首页看看，点卡片右上角 ☆ 即可收藏";
+        empty.style.whiteSpace = "pre-line";
+        el.appendChild(empty);
+        return;
+      }
+      EXHIBITIONS.forEach(function (ex) {
+        if (isFavorite(ex.id)) el.appendChild(makeCard(ex));
+      });
+    }
+
+    /* ====================== 我的 ====================== */
+
+    function renderMine() {
+      var avatar = document.getElementById("avatar");
+      avatar.innerHTML = '<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font-size:26px;font-weight:800;color:#fff;background:linear-gradient(135deg,#8B9AF5,#6B77E8);border-radius:50%">云</span>';
+      document.getElementById("wantCount").textContent = favorites.length + " 个展会";
+    }
+    renderMine();
+
+    /* ====================== 社区 ====================== */
+
+    function renderPosts() {
+      var el = document.getElementById("postList");
+      if (el.childElementCount) return;
+      POSTS.forEach(function (post) {
+        var card = document.createElement("article");
+        card.className = "post";
+
+        var imgs = "";
+        post.imgs.forEach(function (seed) {
+          imgs += '<div><img src="' + imgSrc(seed, 200, 200) + '" alt=""></div>';
+        });
+        card.innerHTML =
+          '<div class="post-head">' +
+            '<div class="post-avatar"><img src="' + imgSrc(post.avatar, 80, 80) + '" alt=""></div>' +
+            '<div class="post-user"><div class="name">' + post.user + '</div><div class="time">' + post.time + '</div></div>' +
+            '<button class="follow-btn">关注</button>' +
+          '</div>' +
+          '<div class="post-text">' + post.text + '</div>' +
+          '<div class="post-imgs">' + imgs + '</div>' +
+          '<span class="post-tag">' + post.tag + '</span>' +
+          '<div class="post-actions">' +
+            '<button><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>' + post.likes + '</button>' +
+            '<button><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' + post.comments + '</button>' +
+            '<button><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>' + post.shares + '</button>' +
+          '</div>';
+        card.querySelectorAll("img").forEach(function (im) {
+          im.onerror = function () { im.style.display = "none"; };
+        });
+        el.appendChild(card);
+      });
+    }
+
+    document.getElementById("addPostBtn").addEventListener("click", function () {
+      showToast("发帖功能开发中，敬请期待");
+    });
+    document.getElementById("fabPost").addEventListener("click", function () {
+      showToast("发布点评功能开发中，敬请期待");
+    });
+
+    /* ====================== 详情页 ====================== */
+
+    var EXH_DESC = {
+      exh_led: "本届展会以\"数字赋能文旅，创新链接未来\"为主题，汇聚全球文旅科技企业与创新项目，展示数字文旅新场景、新技术与新业态。",
+      exh_textile: "汇集国内外顶尖纺织服装品牌，呈现最新面料工艺与时尚趋势，是行业交流与商贸对接的重要平台。",
+      exh_garden: "聚焦园林景观、绿化苗木、生态修复等领域，展示前沿设计理念与环保材料应用。",
+      exh_optics: "涵盖光电子、激光、红外、显示等全产业链，呈现光电科技的最新突破与应用场景。",
+      exh_dental: "华东地区最具影响力的口腔专业展会，汇聚口腔医疗器械、耗材与技术服务。",
+      exh_beauty: "美妆创新领域的年度盛会，展示新锐品牌、创新原料与潮流趋势。"
+    };
+
+    function renderDetail() {
+      if (!detailEx) return;
+      var ex = detailEx;
+      var st = statusOf(ex);
+      var badgeColor = { ongoing: "var(--green)", upcoming: "var(--orange)", ending: "var(--red)", ended: "var(--text-muted)" }[st];
+      document.getElementById("detailHero").innerHTML =
+        '<img src="' + imgSrc(ex.img, 600, 400) + '" alt="' + ex.name + '" onerror="this.style.display=\'none\'">';
+      var favOn = isFavorite(ex.id);
+      document.getElementById("detailBody").innerHTML =
+        '<div class="detail-title">' + ex.name + '</div>' +
+        '<div class="detail-meta-row">' +
+          '<span class="detail-status" style="background:' + badgeColor + '">' + STATUS_TEXT[st] + '</span>' +
+          '<span class="detail-rating">' +
+            '<svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.5L12 17.8 6.1 20.1l1.2-6.5L2.5 9l6.6-.9L12 2z"/></svg>' +
+            ex.rating + '<span class="rcount">（' + (1249 + ex.rating * 10 | 0) + '人评分）</span>' +
+          '</span>' +
+        '</div>' +
+        '<div class="detail-info-line">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>' +
+          ex.date + '  09:00 - 17:00' +
+        '</div>' +
+        '<div class="detail-info-line">' +
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-7.5-8-13a8 8 0 1 1 16 0c0 5.5-8 13-8 13z"/><circle cx="12" cy="9" r="3"/></svg>' +
+          ex.venue +
+        '</div>' +
+        '<div class="detail-section-title">活动简介</div>' +
+        '<div class="detail-desc">' + (EXH_DESC[ex.id] || "精彩展览，不容错过。") + '</div>' +
+        '<div class="detail-actions">' +
+          '<button class="detail-action' + (favOn ? ' on' : '') + '" id="dActFav">' +
+            '<svg viewBox="0 0 24 24" fill="' + (favOn ? 'currentColor' : 'none') + '" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.5L12 17.8 6.1 20.1l1.2-6.5L2.5 9l6.6-.9L12 2z"/></svg>' +
+            '<span>收藏</span>' +
+          '</button>' +
+          '<button class="detail-action" id="dActShare">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.6 13.5 6.8 4M15.4 6.5l-6.8 4"/></svg>' +
+            '<span>分享</span>' +
+          '</button>' +
+          '<button class="detail-action" id="dActRemind">' +
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18M3 12h18M3 17h18"/><rect x="3" y="3" width="18" height="18" rx="2"/></svg>' +
+            '<span>提醒开票</span>' +
+          '</button>' +
+        '</div>' +
+        '<button class="go-here-btn" id="dGoHere">' +
+          '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-7.5-8-13a8 8 0 1 1 16 0c0 5.5-8 13-8 13z"/><circle cx="12" cy="9" r="3"/></svg>' +
+          '去这里' +
+        '</button>' +
+        '<div class="detail-tabs">' +
+          '<button class="on">活动亮点</button>' +
+          '<button>展商信息</button>' +
+          '<button>相关活动</button>' +
+        '</div>' +
+        '<div class="review-section">' +
+          '<div class="review-head"><h3>展会测评</h3><span style="font-size:11px;color:var(--text-sub)">暂无测评，来抢首评</span></div>' +
+          '<div class="review-empty">还没有人测评，来写下第一条吧</div>' +
+          '<div class="write-review">' +
+            '<h4>写下你的测评</h4>' +
+            '<div class="star-row" id="starRow">' +
+              '<button data-star="1"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.5L12 17.8 6.1 20.1l1.2-6.5L2.5 9l6.6-.9L12 2z"/></svg></button>' +
+              '<button data-star="2"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.5L12 17.8 6.1 20.1l1.2-6.5L2.5 9l6.6-.9L12 2z"/></svg></button>' +
+              '<button data-star="3"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.5L12 17.8 6.1 20.1l1.2-6.5L2.5 9l6.6-.9L12 2z"/></svg></button>' +
+              '<button data-star="4"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.5L12 17.8 6.1 20.1l1.2-6.5L2.5 9l6.6-.9L12 2z"/></svg></button>' +
+              '<button data-star="5"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.5L12 17.8 6.1 20.1l1.2-6.5L2.5 9l6.6-.9L12 2z"/></svg></button>' +
+              '<span class="hint">点击评分</span>' +
+            '</div>' +
+            '<textarea class="review-textarea" id="reviewInput" maxlength="200" placeholder="分享你的看展体验（至少 10 个字）"></textarea>' +
+            '<div class="review-footer">' +
+              '<span class="char-count" id="charCount">0/200</span>' +
+              '<button class="publish-btn" id="publishReview">' +
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>发布测评' +
+              '</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      // 顶栏收藏状态
+      var df = document.getElementById("detailFav");
+      df.classList.toggle("on", favOn);
+      df.querySelector("svg").setAttribute("fill", favOn ? "currentColor" : "none");
+      df.querySelector("svg").style.color = favOn ? "var(--orange)" : "";
+
+      bindDetailEvents();
+    }
+
+    function bindDetailEvents() {
+      var ex = detailEx;
+      document.getElementById("dActFav").onclick = function () { toggleFavorite(ex); renderDetail(); };
+      document.getElementById("dActShare").onclick = function () { showToast("已复制分享链接"); };
+      document.getElementById("dActRemind").onclick = function () { go("remind"); };
+      document.getElementById("dGoHere").onclick = function () { go("gohere"); };
+      document.getElementById("detailFav").onclick = function () { toggleFavorite(ex); renderDetail(); };
+      document.getElementById("detailShare").onclick = function () { showToast("已复制分享链接"); };
+      document.getElementById("detailBack").onclick = function () { goBack(); };
+
+      var input = document.getElementById("reviewInput");
+      var count = document.getElementById("charCount");
+      input.addEventListener("input", function () {
+        count.textContent = input.value.length + "/200";
+      });
+      var stars = 0;
+      document.querySelectorAll("#starRow button").forEach(function (b) {
+        b.addEventListener("click", function () {
+          stars = parseInt(b.getAttribute("data-star"));
+          document.querySelectorAll("#starRow button").forEach(function (s, idx) {
+            s.classList.toggle("on", idx < stars);
+          });
+        });
+      });
+      document.getElementById("publishReview").onclick = function () {
+        if (!stars) { showToast("请先评分"); return; }
+        if (input.value.trim().length < 10) { showToast("测评内容至少 10 个字"); return; }
+        showToast("测评发布成功！");
+        input.value = ""; count.textContent = "0/200"; stars = 0;
+        document.querySelectorAll("#starRow button").forEach(function (s) { s.classList.remove("on"); });
+      };
+    }
+
+    /* ====================== 提醒开票页 ====================== */
+
+    var remindFilter = "all";
+    function renderRemind() {
+      document.getElementById("remindTitle").textContent = "10月18日 · 活动列表";
+      var list = EXHIBITIONS.filter(function (ex) {
+        if (remindFilter === "all") return true;
+        if (remindFilter === "ongoing") return statusOf(ex) === "ongoing" || statusOf(ex) === "ending";
+        return statusOf(ex) === remindFilter;
+      });
+      var el = document.getElementById("remindList");
+      el.innerHTML = "";
+      list.forEach(function (ex) {
+        var st = statusOf(ex);
+        var badgeColor = { ongoing: "var(--green)", upcoming: "var(--orange)", ending: "var(--red)", ended: "var(--text-muted)" }[st];
+        var item = document.createElement("div");
+        item.className = "day-item";
+        item.style.cursor = "pointer";
+        item.innerHTML =
+          '<div class="d-head">' +
+            '<div style="display:flex;gap:10px;flex:1">' +
+              '<div class="exh-thumb" style="width:60px;height:60px;flex-shrink:0"><img src="' + imgSrc(ex.img, 120, 120) + '" onerror="this.style.display=\'none\'"></div>' +
+              '<div style="flex:1">' +
+                '<div class="d-name">' + ex.name + '</div>' +
+                '<div class="d-meta">09:00 - 17:00　' + ex.venue + '</div>' +
+                '<div class="detail-rating" style="margin-top:4px"><svg viewBox="0 0 24 24"><path d="M12 2l2.9 6.1 6.6.9-4.8 4.6 1.2 6.5L12 17.8 6.1 20.1l1.2-6.5L2.5 9l6.6-.9L12 2z"/></svg>' + ex.rating + '</div>' +
+              '</div>' +
+            '</div>' +
+            '<span class="d-status" style="background:' + badgeColor + '">' + STATUS_TEXT[st] + '</span>' +
+          '</div>';
+        item.addEventListener("click", function () { openDetail(ex); });
+        el.appendChild(item);
+      });
+    }
+
+    document.querySelectorAll("#remindTabs button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        remindFilter = b.getAttribute("data-filter");
+        document.querySelectorAll("#remindTabs button").forEach(function (x) { x.classList.toggle("on", x === b); });
+        renderRemind();
+      });
+    });
+    document.getElementById("remindClose").addEventListener("click", function () { goBack(); });
+
+    /* ====================== 去这里页 ====================== */
+
+    var navMode = "taxi";
+    function renderGohere() {
+      var venue = detailEx ? detailEx.venue : "杭州国际博览中心";
+      document.getElementById("gohereTitle").textContent = "前往 · " + venue;
+      document.getElementById("navMap").innerHTML =
+        '<div class="route-line"></div><div class="pin-a"></div><div class="pin-b"></div>';
+      var opts = {
+        taxi: [
+          { icon: "car", title: "预计 12 分钟", sub: "约 6.8 公里", btn: "呼叫打车", primary: true }
+        ],
+        transit: [
+          { icon: "train", title: "地铁 1 号线 → 387 路", sub: "约 28 分钟 · 6.2 公里", btn: "查看路线", primary: false }
+        ],
+        walk: [
+          { icon: "walk", title: "步行", sub: "约 1 小时 32 分钟 · 6.5 公里", btn: "查看路线", primary: false }
+        ]
+      };
+      var icons = {
+        car: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 17h14M6 17l1.5-6h9L18 17M7 17v2M17 17v2"/><circle cx="8" cy="15" r="1.2"/><circle cx="16" cy="15" r="1.2"/></svg>',
+        train: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="3" width="14" height="13" rx="3"/><path d="M5 11h14M9 19l-2 2M15 19l2 2M9 15h.01M15 15h.01"/></svg>',
+        walk: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="13" cy="4" r="2"/><path d="M13 6l-2 5-3 2 2 4M11 11l4 1 3 4"/></svg>'
+      };
+      var el = document.getElementById("navOptions");
+      el.innerHTML = "";
+      opts[navMode].forEach(function (o) {
+        var div = document.createElement("div");
+        div.className = "nav-option";
+        div.innerHTML =
+          '<div class="no-ic">' + icons[o.icon] + '</div>' +
+          '<div class="no-info"><div class="no-title">' + o.title + '</div><div class="no-sub">' + o.sub + '</div></div>' +
+          '<button class="no-btn' + (o.primary ? '' : ' secondary') + '">' + o.btn + '</button>';
+        el.appendChild(div);
+      });
+    }
+
+    document.querySelectorAll(".nav-tabs button").forEach(function (b) {
+      b.addEventListener("click", function () {
+        navMode = b.getAttribute("data-nav");
+        document.querySelectorAll(".nav-tabs button").forEach(function (x) { x.classList.toggle("on", x === b); });
+        renderGohere();
+      });
+    });
+    document.getElementById("gohereBack").addEventListener("click", function () { go("detail"); });
+
+    /* ====================== 弹层 & 提示 ====================== */
+
+    var mask = document.getElementById("mask");
+    var dialog = document.getElementById("dialog");
+
+    function closeDialog() { mask.classList.add("hidden"); }
+    mask.addEventListener("click", function (e) { if (e.target === mask) closeDialog(); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeDialog(); });
+
+    function showToast(text) {
+      var toast = document.getElementById("toast");
+      toast.textContent = text;
+      toast.classList.add("show");
+      clearTimeout(toast._timer);
+      toast._timer = setTimeout(function () { toast.classList.remove("show"); }, 2200);
+    }
+
+    /* ====================== 搜索 ====================== */
+
+    var input = document.getElementById("searchInput");
+
+    function doSearch() {
+      var keyword = input.value.trim();
+      if (!keyword) { showToast("请输入活动/场馆/展会关键词"); input.focus(); return; }
+      var results = EXHIBITIONS.filter(function (ex) {
+        return ex.name.indexOf(keyword) !== -1 || ex.venue.indexOf(keyword) !== -1 || ex.tag.indexOf(keyword) !== -1;
+      });
+      dialog.innerHTML = "";
+      var head = document.createElement("div");
+      head.className = "dialog-head";
+      var h3 = document.createElement("h3");
+      h3.textContent = "搜索结果（" + results.length + "）";
+      var close = document.createElement("button");
+      close.className = "icon-close"; close.type = "button"; close.textContent = "×";
+      close.addEventListener("click", closeDialog);
+      head.appendChild(h3); head.appendChild(close);
+      var body = document.createElement("div");
+      body.className = "dialog-body";
+      if (!results.length) {
+        var empty = document.createElement("div");
+        empty.className = "empty-tip";
+        empty.textContent = "未找到相关内容，试试其他关键词";
+        body.appendChild(empty);
+      } else {
+        results.forEach(function (ex) {
+          var item = document.createElement("div");
+          item.className = "result-item";
+          item.innerHTML = '<div class="r-name">' + ex.name + '</div>' +
+            '<div class="r-meta">' + ex.date + ' | ' + ex.venue + ' | 评分 ' + ex.rating + '</div>';
+          body.appendChild(item);
+        });
+      }
+      dialog.appendChild(head);
+      dialog.appendChild(body);
+      mask.classList.remove("hidden");
+    }
+
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter") doSearch(); });
+    document.getElementById("searchIcon").addEventListener("click", doSearch);
+    input.addEventListener("blur", function () {
+      // 兼容移动端收起键盘后点击搜索
+    });
+    // 首页搜索按钮在 search-bar 内没有单独按钮，按回车触发
+    // 点击搜索框直接聚焦（已是 input）
+
+  })();
+  </script>
+</body>
+</html>
